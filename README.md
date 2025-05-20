@@ -1,0 +1,1 @@
+ The Dynamic Meditation Scapes features a full-screen animated visual that's designed to be calming and conducive to meditation. We'll use a combination of gently moving particles and a subtly shifting background gradient to create a serene and dynamic visual experience.

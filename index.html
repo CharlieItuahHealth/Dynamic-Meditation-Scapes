@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Meditation Scapes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow: hidden; /* Prevent scrollbars */
+            background-color: #000; /* Fallback background */
+        }
+        canvas {
+            display: block; /* Remove extra space below canvas */
+            width: 100vw;
+            height: 100vh;
+        }
+        .overlay-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            z-index: 10;
+        }
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            display: flex;
+            gap: 10px;
+        }
+        .control-button {
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 14px;
+        }
+        .control-button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background-color: rgba(0,0,0,0.5);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 20;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body class="bg-slate-900">
+    <canvas id="meditationCanvas"></canvas>
+
+    <div class="info-panel">
+        <h1 class="text-2xl font-bold mb-2">Dynamic Meditation Scapes</h1>
+        <p class="text-sm">Focus on the gentle movement and shifting colors. Let your thoughts drift. Use the controls below to customize your experience.</p>
+    </div>
+
+    <div class="controls">
+        <button id="toggleAnimationButton" class="control-button">Pause</button>
+        <button id="changeSceneButton" class="control-button">Change Scene</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('meditationCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let animationFrameId;
+        let isPaused = false;
+        let particles = [];
+        let hue = 0; // For background color cycling
+        let currentScene = 'gentleParticles'; // Initial scene
+
+        // Scene configurations
+        const scenes = {
+            gentleParticles: {
+                particleCount: 100,
+                particleSpeed: 0.3,
+                particleRadiusRange: [1, 3],
+                backgroundColor: () => `hsl(${hue % 360}, 50%, 10%)`, // Dark, desaturated
+                particleColor: () => `hsla(${(hue + 180) % 360}, 70%, 70%, 0.8)`, // Contrasting, somewhat bright
+                updateLogic: updateGentleParticles,
+                drawLogic: drawGentleParticles,
+                initLogic: initGentleParticles
+            },
+            starryNight: {
+                particleCount: 200,
+                particleSpeed: 0.1,
+                particleRadiusRange: [0.5, 1.5],
+                backgroundColor: () => `hsl(240, 60%, 5%)`, // Very dark blue
+                particleColor: () => `hsla(60, 100%, 90%, ${Math.random() * 0.5 + 0.5})`, // Twinkling yellow-white stars
+                updateLogic: updateStarryNight,
+                drawLogic: drawStarryNight,
+                initLogic: initStarryNight
+            },
+            oceanDepths: {
+                particleCount: 50,
+                particleSpeed: 0.4,
+                particleRadiusRange: [2, 8], // Larger, like bubbles or plankton
+                backgroundColor: () => `hsl(${200 + Math.sin(hue/100) * 20}, 70%, 15%)`, // Deep blues, shifting
+                particleColor: () => `hsla(${180 + Math.sin(hue/50) * 30}, 80%, 60%, 0.6)`, // Bioluminescent teals/cyans
+                updateLogic: updateOceanDepths,
+                drawLogic: drawOceanDepths,
+                initLogic: initOceanDepths
+            }
+        };
+
+        // --- Particle Class (Generic) ---
+        class Particle {
+            constructor(x, y, radius, color, speed) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.speed = speed;
+                this.vx = (Math.random() - 0.5) * this.speed;
+                this.vy = (Math.random() - 0.5) * this.speed;
+                this.opacity = Math.random() * 0.5 + 0.5; // Initial opacity
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Boundary checks (wrap around)
+                if (this.x < 0) this.x = canvas.width;
+                if (this.x > canvas.width) this.x = 0;
+                if (this.y < 0) this.y = canvas.height;
+                if (this.y > canvas.height) this.y = 0;
+            }
+        }
+        
+        // --- Scene Specific Logic ---
+
+        // Scene 1: Gentle Particles
+        function initGentleParticles() {
+            particles = [];
+            const config = scenes.gentleParticles;
+            for (let i = 0; i < config.particleCount; i++) {
+                const radius = Math.random() * (config.particleRadiusRange[1] - config.particleRadiusRange[0]) + config.particleRadiusRange[0];
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                particles.push(new Particle(x, y, radius, config.particleColor(), config.particleSpeed));
+            }
+        }
+
+        function updateGentleParticles() {
+            particles.forEach(p => {
+                p.update();
+                // Optional: Add some more specific behavior, e.g., slight attraction to center or mouse
+            });
+        }
+
+        function drawGentleParticles() {
+            particles.forEach(p => p.draw());
+        }
+
+        // Scene 2: Starry Night
+        function initStarryNight() {
+            particles = [];
+            const config = scenes.starryNight;
+            for (let i = 0; i < config.particleCount; i++) {
+                const radius = Math.random() * (config.particleRadiusRange[1] - config.particleRadiusRange[0]) + config.particleRadiusRange[0];
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const particle = new Particle(x, y, radius, config.particleColor(), config.particleSpeed);
+                particle.twinkleSpeed = Math.random() * 0.05 + 0.01; // How fast it twinkles
+                particle.baseOpacity = Math.random() * 0.3 + 0.2; // Base opacity for twinkling
+                particles.push(particle);
+            }
+        }
+
+        function updateStarryNight() {
+            particles.forEach(p => {
+                p.update();
+                // Twinkle effect
+                p.opacity = p.baseOpacity + Math.sin(Date.now() * p.twinkleSpeed) * p.baseOpacity;
+                p.color = `hsla(60, 100%, 90%, ${p.opacity})`;
+            });
+        }
+        
+        function drawStarryNight() {
+            particles.forEach(p => p.draw());
+        }
+
+        // Scene 3: Ocean Depths
+        function initOceanDepths() {
+            particles = [];
+            const config = scenes.oceanDepths;
+            for (let i = 0; i < config.particleCount; i++) {
+                const radius = Math.random() * (config.particleRadiusRange[1] - config.particleRadiusRange[0]) + config.particleRadiusRange[0];
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const particle = new Particle(x, y, radius, config.particleColor(), config.particleSpeed);
+                particle.waveOffset = Math.random() * Math.PI * 2; // For sine wave movement
+                particles.push(particle);
+            }
+        }
+
+        function updateOceanDepths() {
+            particles.forEach(p => {
+                p.update();
+                // Add a gentle up/down bobbing motion
+                p.y += Math.sin(Date.now() * 0.0005 + p.waveOffset) * 0.3;
+                p.color = scenes.oceanDepths.particleColor(); // Update color for dynamic effect
+            });
+        }
+
+        function drawOceanDepths() {
+             particles.forEach(p => {
+                // Add a subtle glow effect
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = p.color;
+                p.draw();
+                ctx.shadowBlur = 0; // Reset shadow
+            });
+        }
+
+
+        // --- Core Animation Loop ---
+        function animate() {
+            if (isPaused) {
+                animationFrameId = requestAnimationFrame(animate);
+                return;
+            }
+
+            // Update hue for background color cycling
+            hue += 0.1;
+
+            // Set canvas dimensions (responsive)
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            // Clear canvas with the scene's background color
+            const sceneConfig = scenes[currentScene];
+            ctx.fillStyle = sceneConfig.backgroundColor();
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw particles based on current scene
+            sceneConfig.updateLogic();
+            sceneConfig.drawLogic();
+            
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        // --- Event Listeners ---
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // Re-initialize particles for the current scene on resize to fit new dimensions
+            scenes[currentScene].initLogic(); 
+        });
+
+        document.getElementById('toggleAnimationButton').addEventListener('click', () => {
+            isPaused = !isPaused;
+            document.getElementById('toggleAnimationButton').textContent = isPaused ? 'Play' : 'Pause';
+        });
+
+        document.getElementById('changeSceneButton').addEventListener('click', () => {
+            const sceneKeys = Object.keys(scenes);
+            let currentIndex = sceneKeys.indexOf(currentScene);
+            currentIndex = (currentIndex + 1) % sceneKeys.length;
+            currentScene = sceneKeys[currentIndex];
+            scenes[currentScene].initLogic(); // Initialize new scene
+            isPaused = false; // Ensure animation plays when scene changes
+            document.getElementById('toggleAnimationButton').textContent = 'Pause';
+        });
+
+        // --- Initialization ---
+        function init() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            scenes[currentScene].initLogic(); // Initialize the default scene
+            animate();
+        }
+
+        // Start the animation when the window is loaded
+        window.onload = init;
+    </script>
+</body>
+</html>
